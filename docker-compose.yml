@@ -1,0 +1,65 @@
+version: '3.7'
+
+volumes:
+  pg_project:
+  redis-data:
+
+services:
+  backend:
+    image: backend:latest
+    container_name: backend
+    depends_on:
+      - pg_db
+      - redis
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .docker.env
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+  pg_db:
+    image: postgres:latest
+    restart: always
+    build:
+      context: ./Docker
+      dockerfile: db.Dockerfile
+    volumes:
+      - ./docker/sql/scripts:/docker-entrypoint-initdb.d
+      - ./.database/postgres/data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: nft-marketplace
+    ports:
+      - ${POSTGRES_PORT:-5436}:5432
+
+  redis:
+    image: redis:alpine
+    restart: always
+    build:
+      context: ./Docker
+      dockerfile: rs.Dockerfile
+    ports:
+      - "6380:6379"
+    volumes:
+#      - ./.redis/redis-data:/var/lib/redis
+      - redis-data:/usr/local/etc/redis
+    environment:
+      - REDIS_REPLICATION_MODE=master
+    networks:
+      node_net:
+        ipv4_address: 172.28.1.4
+
+# networking for the Redis container
+networks:
+  node_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
